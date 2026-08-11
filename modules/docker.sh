@@ -1,9 +1,10 @@
 #!/bin/bash
+# ============================================================
+# 模块: docker.sh —— Docker容器/镜像管理
+# 小战云Linux超级工具箱
+# ============================================================
 
-if [ -f "${TOOLBOX_DIR}/common.sh" ]; then
-    source "${TOOLBOX_DIR}/common.sh"
-fi
-
+# 🐳 Docker管理 - 终极质感增强版
 function docker_management() {
     show_header
     echo -e "${GOLD}🐳 ====== Docker管理 ======${NC}"
@@ -192,6 +193,3 @@ function docker_management() {
             ;;
     esac
 }
-
-
-docker_management

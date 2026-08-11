@@ -1,8 +1,8 @@
 #!/bin/bash
-
-if [ -f "${TOOLBOX_DIR}/common.sh" ]; then
-    source "${TOOLBOX_DIR}/common.sh"
-fi
+# ============================================================
+# 模块: advanced_tools.sh —— 高级系统工具(清理/大文件/服务/优化/用户/内核/换源)
+# 小战云Linux超级工具箱
+# ============================================================
 
 function advanced_tools() {
     show_header
@@ -315,5 +315,206 @@ function system_optimize() {
     system_optimize
 }
 
+# 👥 用户管理 - 新增实现
+function user_management() {
+    show_header
+    echo -e "${GOLD}👥 ====== 用户管理 ======${NC}"
+    gradient_border
+    echo -e "${GREEN}📋 1. 列出所有用户${NC}"
+    echo -e "${BLUE}➕ 2. 新增用户${NC}"
+    echo -e "${RED}🗑️  3. 删除用户${NC}"
+    echo -e "${CYAN}🔑 4. 修改用户密码${NC}"
+    echo -e "${YELLOW}👑 5. 添加用户到sudo/wheel组${NC}"
+    echo -e "${PURPLE}📊 6. 查看当前登录用户${NC}"
+    echo -e "${ORANGE}↩️  7. 返回上级菜单${NC}"
+    gradient_border
 
-advanced_tools
+    read -p "🎯 请输入选项 [1-7]: " choice
+
+    case $choice in
+        1)
+            echo -e "${YELLOW}📋 系统用户列表 (UID>=1000):${NC}"
+            separator "─" "$BLUE"
+            awk -F: '$3>=1000 && $3<65534 {print "  👤 " $1 "  (UID:" $3 ", HOME:" $6 ")"}' /etc/passwd
+            ;;
+        2)
+            read -p "🎯 请输入新用户名: " new_user
+            if id "$new_user" &>/dev/null; then
+                echo -e "${RED}❌ 用户已存在${NC}"
+            else
+                sudo useradd -m -s /bin/bash "$new_user" && sudo passwd "$new_user"
+                echo -e "${GREEN}✅ 用户 $new_user 创建完成${NC}"
+            fi
+            ;;
+        3)
+            read -p "🎯 请输入要删除的用户名: " del_user
+            read -p "🎯 是否同时删除家目录? [y/N]: " del_home
+            if [[ "$del_home" =~ ^[Yy]$ ]]; then
+                sudo userdel -r "$del_user" && echo -e "${GREEN}✅ 用户及家目录已删除${NC}"
+            else
+                sudo userdel "$del_user" && echo -e "${GREEN}✅ 用户已删除${NC}"
+            fi
+            ;;
+        4)
+            read -p "🎯 请输入要修改密码的用户名: " pw_user
+            sudo passwd "$pw_user"
+            ;;
+        5)
+            read -p "🎯 请输入要提升权限的用户名: " sudo_user
+            if command -v usermod &>/dev/null; then
+                if grep -q '^sudo:' /etc/group; then
+                    sudo usermod -aG sudo "$sudo_user"
+                else
+                    sudo usermod -aG wheel "$sudo_user"
+                fi
+                echo -e "${GREEN}✅ 已将 $sudo_user 加入管理员组${NC}"
+            fi
+            ;;
+        6)
+            echo -e "${YELLOW}📊 当前登录用户:${NC}"
+            separator "─" "$BLUE"
+            who | while read line; do echo -e "  ${GREEN}🟢 $line${NC}"; done
+            ;;
+        7)
+            advanced_tools
+            return
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${NC}"
+            sleep 1
+            user_management
+            return
+            ;;
+    esac
+
+    separator "━" "$GREEN"
+    read -p "⏎ 按回车键继续..." dummy
+    user_management
+}
+
+# ⚙️ 内核管理 - 新增实现
+function kernel_management() {
+    show_header
+    echo -e "${GOLD}⚙️ ====== 内核管理 ======${NC}"
+    gradient_border
+    echo -e "${GREEN}📋 1. 查看当前内核版本${NC}"
+    echo -e "${BLUE}📦 2. 列出已安装的内核${NC}"
+    echo -e "${RED}🗑️  3. 清理旧内核${NC}"
+    echo -e "${CYAN}🔧 4. 查看已加载内核模块${NC}"
+    echo -e "${YELLOW}↩️  5. 返回上级菜单${NC}"
+    gradient_border
+
+    read -p "🎯 请输入选项 [1-5]: " choice
+
+    case $choice in
+        1)
+            echo -e "${YELLOW}📋 当前内核版本:${NC}"
+            separator "─" "$BLUE"
+            echo -e "  ${GREEN}🐧 $(uname -r)${NC}"
+            uname -a | sed 's/^/  📌 /'
+            ;;
+        2)
+            echo -e "${YELLOW}📦 已安装内核:${NC}"
+            separator "─" "$BLUE"
+            if [ -f /usr/bin/apt ]; then
+                dpkg --list | grep -E '^ii.*linux-image' | awk '{print "  🐧 " $2}'
+            elif [ -f /usr/bin/yum ]; then
+                rpm -q kernel | sed 's/^/  🐧 /'
+            fi
+            ;;
+        3)
+            echo -e "${BLUE}🗑️  正在清理旧内核...${NC}"
+            progress_bar 1
+            if [ -f /usr/bin/apt ]; then
+                sudo apt autoremove --purge -y
+            elif [ -f /usr/bin/yum ]; then
+                sudo package-cleanup --oldkernels --count=1 -y 2>/dev/null || echo -e "${YELLOW}⚠️  需要安装 yum-utils 才能清理旧内核${NC}"
+            fi
+            echo -e "${GREEN}✅ 旧内核清理完成${NC}"
+            ;;
+        4)
+            echo -e "${YELLOW}🔧 已加载内核模块 (前20个):${NC}"
+            separator "─" "$BLUE"
+            lsmod | head -21 | tail -20 | while read line; do echo -e "  ${CYAN}🧩 $line${NC}"; done
+            ;;
+        5)
+            advanced_tools
+            return
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${NC}"
+            sleep 1
+            kernel_management
+            return
+            ;;
+    esac
+
+    separator "━" "$GREEN"
+    read -p "⏎ 按回车键继续..." dummy
+    kernel_management
+}
+
+# ⚡ 一键换源加速 - 新增实现
+function change_source() {
+    show_header
+    echo -e "${GOLD}⚡ ====== 一键换源加速 ======${NC}"
+    gradient_border
+    echo -e "${YELLOW}⚠️  注意: 换源将备份原有源文件后再替换${NC}"
+    separator "─" "$YELLOW"
+    echo -e "${GREEN}1. 阿里云镜像源${NC}"
+    echo -e "${BLUE}2. 清华大学镜像源${NC}"
+    echo -e "${CYAN}3. 华为云镜像源${NC}"
+    echo -e "${RED}4. 返回主菜单${NC}"
+    gradient_border
+
+    read -p "🎯 请选择镜像源 [1-4]: " src_choice
+    [ "$src_choice" = "4" ] && { main_menu; return; }
+
+    local mirror_name
+    case $src_choice in
+        1) mirror_name="阿里云" ;;
+        2) mirror_name="清华大学" ;;
+        3) mirror_name="华为云" ;;
+        *) echo -e "${RED}❌ 无效选项${NC}"; sleep 1; change_source; return ;;
+    esac
+
+    echo -e "${BLUE}📦 检测系统类型...${NC}"
+
+    if [ -f /etc/apt/sources.list ]; then
+        echo -e "${GREEN}✅ 检测到 Debian/Ubuntu (APT)${NC}"
+        sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak.$(date +%Y%m%d)
+        echo -e "${GREEN}✅ 已备份原有源文件${NC}"
+        . /etc/os-release
+        case $src_choice in
+            1) base_url="https://mirrors.aliyun.com" ;;
+            2) base_url="https://mirrors.tuna.tsinghua.edu.cn" ;;
+            3) base_url="https://repo.huaweicloud.com" ;;
+        esac
+        echo -e "${YELLOW}💡 检测到系统: $ID $VERSION_CODENAME${NC}"
+        echo -e "${YELLOW}💡 请根据发行版手动确认源模板是否匹配，本工具已生成参考配置${NC}"
+        {
+            echo "deb $base_url/$ID $VERSION_CODENAME main restricted universe multiverse"
+            echo "deb $base_url/$ID $VERSION_CODENAME-updates main restricted universe multiverse"
+            echo "deb $base_url/$ID $VERSION_CODENAME-security main restricted universe multiverse"
+        } | sudo tee /etc/apt/sources.list > /dev/null
+        sudo apt update
+        echo -e "${GREEN}🎉 已切换为 $mirror_name 源并更新完成${NC}"
+    elif [ -d /etc/yum.repos.d ]; then
+        echo -e "${GREEN}✅ 检测到 CentOS/RHEL (YUM)${NC}"
+        sudo mkdir -p /etc/yum.repos.d/backup
+        sudo mv /etc/yum.repos.d/*.repo /etc/yum.repos.d/backup/ 2>/dev/null
+        case $src_choice in
+            1) curl -o /etc/yum.repos.d/CentOS-Base.repo https://mirrors.aliyun.com/repo/Centos-7.repo ;;
+            2) curl -o /etc/yum.repos.d/CentOS-Base.repo https://mirrors.tuna.tsinghua.edu.cn/help/centos.html ;;
+            3) curl -o /etc/yum.repos.d/CentOS-Base.repo https://repo.huaweicloud.com/repository/conf/CentOS-7-reg.repo ;;
+        esac
+        sudo yum clean all && sudo yum makecache
+        echo -e "${GREEN}🎉 已切换为 $mirror_name 源并生成缓存完成${NC}"
+    else
+        echo -e "${RED}❌ 无法识别系统的包管理器${NC}"
+    fi
+
+    gradient_border
+    read -p "⏎ 按回车键返回主菜单..." dummy
+    main_menu
+}

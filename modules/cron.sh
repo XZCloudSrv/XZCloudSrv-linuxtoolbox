@@ -1,9 +1,10 @@
 #!/bin/bash
+# ============================================================
+# 模块: cron.sh —— 定时任务管理
+# 小战云Linux超级工具箱
+# ============================================================
 
-if [ -f "${TOOLBOX_DIR}/common.sh" ]; then
-    source "${TOOLBOX_DIR}/common.sh"
-fi
-
+# ⏰ 定时任务管理 - 终极质感增强版
 function cron_management() {
     show_header
     echo -e "${GOLD}⏰ ====== 定时任务管理 ======${NC}"
@@ -128,6 +129,3 @@ function cron_management() {
     read -p "⏎ 按回车键继续..." dummy
     cron_management
 }
-
-
-cron_management

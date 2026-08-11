@@ -1,9 +1,10 @@
 #!/bin/bash
+# ============================================================
+# 模块: install_uninstall.sh —— 工具箱系统级安装/卸载
+# 小战云Linux超级工具箱
+# ============================================================
 
-if [ -f "${TOOLBOX_DIR}/common.sh" ]; then
-    source "${TOOLBOX_DIR}/common.sh"
-fi
-
+# 📦 安装/卸载菜单
 function install_menu() {
     show_header
     if $INSTALLED; then
@@ -12,10 +13,10 @@ function install_menu() {
         echo -e "${GREEN}✅ 当前状态: 已安装${NC}"
         echo -e "${BLUE}📁 安装路径: /usr/local/bin/xzyun-tool${NC}"
         echo -e "${CYAN}⚡ 快捷命令: xzyun-tool${NC}"
-        echo -e "${YELLOW}🔧 版本: v$VERSION${NC}"
+        echo -e "${YELLOW}🔧 版本: v$TOOLBOX_VERSION${NC}"
         gradient_border
-        
-        echo -e "${RED}⚠️  卸载将移除工具箱的系统安装${NC}"
+
+        echo -e "${RED}⚠️  卸载将移除工具箱的系统安装及模块缓存${NC}"
         read -p "🎯 是否卸载工具箱? [y/N]: " uninstall_choice
         if [[ "$uninstall_choice" =~ ^[Yy]$ ]]; then
             uninstall_toolbox
@@ -31,9 +32,9 @@ function install_menu() {
         echo -e "  ${BLUE}✅ 系统级命令: xzyun-tool${NC}"
         echo -e "  ${CYAN}✅ 任意目录快速启动${NC}"
         echo -e "  ${YELLOW}✅ 自动更新支持${NC}"
-        echo -e "  ${PURPLE}✅ 使用统计功能${NC}"
+        echo -e "  ${PURPLE}✅ 模块按需下载缓存，启动更快${NC}"
         gradient_border
-        
+
         read -p "🎯 是否安装工具箱? [Y/n]: " install_choice
         if [[ ! "$install_choice" =~ ^[Nn]$ ]]; then
             install_toolbox
@@ -45,13 +46,12 @@ function install_menu() {
     fi
 }
 
-# 📥 安装工具箱 - 增强质感版
+# 📥 安装工具箱到系统
 function install_toolbox() {
     show_header
     echo -e "${GOLD}📥 ====== 安装工具箱 ======${NC}"
     gradient_border
-    
-    # 检查是否已经安装
+
     if [ -f /usr/local/bin/xzyun-tool ]; then
         echo -e "${RED}❌ 工具箱已经安装${NC}"
         echo -e "${YELLOW}💡 如需重新安装请先卸载${NC}"
@@ -59,43 +59,45 @@ function install_toolbox() {
         main_menu
         return
     fi
-    
+
     echo -e "${BLUE}📦 创建工具箱目录...${NC}"
     progress_bar 1
-    mkdir -p "$TOOLBOX_DIR"
+    mkdir -p "$TOOLBOX_DIR" "$CACHE_DIR"
     echo "0" > "$COUNTER_FILE"
-    
-    echo -e "${BLUE}📥 下载工具箱脚本...${NC}"
+
+    echo -e "${BLUE}📥 安装加载器到系统...${NC}"
     progress_bar 2
-    curl -sL "$base_url/xzyun-tool.sh" -o /usr/local/bin/xzyun-tool
-    
+    # 优先复制当前正在运行的脚本本体(若为本地路径)，否则从当前线路下载
+    if [ -f "$0" ] && [ "$0" != "bash" ]; then
+        sudo cp "$0" /usr/local/bin/xzyun-tool
+    else
+        sudo curl -sL "${CURRENT_BASE_URL}/xzyun-tool.sh" -o /usr/local/bin/xzyun-tool
+    fi
+
     echo -e "${BLUE}🔧 设置执行权限...${NC}"
-    chmod +x /usr/local/bin/xzyun-tool
-    
+    sudo chmod +x /usr/local/bin/xzyun-tool
+
     echo -e "${BLUE}📝 更新配置...${NC}"
-    echo "INSTALLED=true" > "$CONFIG_FILE"
-    echo "auto_update=true" >> "$CONFIG_FILE"
-    
+    set_config_value "INSTALLED" "true"
+
     separator "━" "$GREEN"
     blink_text "🎉 小战云Linux超级工具箱安装成功！" "$GREEN" "$YELLOW" 3
     echo -e "${CYAN}✨ 现在您可以在任何位置使用以下命令:${NC}"
     echo -e "  ${GREEN}🚀 xzyun-tool${NC} - 启动工具箱"
-    echo -e "  ${BLUE}🔧 xzyun-tool${NC} - 备用命令"
     echo -e "${YELLOW}💫 享受便捷的服务器管理体验吧！${NC}"
-    
+
     gradient_border
     read -p "⏎ 按回车键返回主菜单..." dummy
     INSTALLED=true
     main_menu
 }
 
-# 🗑️ 卸载工具箱 - 增强质感版
+# 🗑️ 卸载工具箱
 function uninstall_toolbox() {
     show_header
     echo -e "${GOLD}🗑️ ====== 卸载工具箱 ======${NC}"
     gradient_border
-    
-    # 检查是否已安装
+
     if [ ! -f /usr/local/bin/xzyun-tool ]; then
         echo -e "${RED}❌ 工具箱未安装${NC}"
         echo -e "${YELLOW}💡 无需卸载${NC}"
@@ -103,13 +105,13 @@ function uninstall_toolbox() {
         main_menu
         return
     fi
-    
+
     echo -e "${YELLOW}⚠️  即将卸载工具箱，此操作不可逆！${NC}"
     echo -e "${GRAY}📋 将删除以下内容:${NC}"
     echo -e "  ${RED}🗑️  /usr/local/bin/xzyun-tool${NC}"
-    echo -e "  ${RED}🗑️  $TOOLBOX_DIR/${NC}"
+    echo -e "  ${RED}🗑️  $TOOLBOX_DIR/ (含模块缓存与线路配置)${NC}"
     separator "─" "$RED"
-    
+
     read -p "🎯 确认卸载? [y/N]: " confirm
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
         echo -e "${YELLOW}⏸️ 取消卸载${NC}"
@@ -117,25 +119,21 @@ function uninstall_toolbox() {
         main_menu
         return
     fi
-    
+
     echo -e "${BLUE}🗑️ 正在卸载工具箱...${NC}"
     progress_bar 2
-    
-    # 删除相关文件
-    rm -f /usr/local/bin/xzyun-tool
-    rm -rf "$TOOLBOX_DIR"
-    
+
+    sudo rm -f /usr/local/bin/xzyun-tool
+    sudo rm -rf "$TOOLBOX_DIR"
+
     separator "━" "$GREEN"
     blink_text "✅ 小战云Linux超级工具箱已成功卸载" "$GREEN" "$CYAN" 2
     echo -e "${YELLOW}💡 您仍然可以使用以下方式运行:${NC}"
-    echo -e "  ${CYAN}bash <(curl -sL "$base_url/xzyun-tool.sh")${NC}"
+    echo -e "  ${CYAN}bash <(curl -sL https://xzy.xzyun.sbs/tools/xzyun-tool.sh)${NC}"
     echo -e "${GRAY}🌟 感谢您的使用，期待再次相遇！${NC}"
-    
+
     gradient_border
     read -p "⏎ 按回车键退出..." dummy
     INSTALLED=false
     exit 0
 }
-
-
-install_menu

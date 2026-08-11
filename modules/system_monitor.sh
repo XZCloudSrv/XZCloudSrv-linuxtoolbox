@@ -1,9 +1,10 @@
 #!/bin/bash
+# ============================================================
+# 模块: system_monitor.sh —— 系统信息监控
+# 小战云Linux超级工具箱
+# ============================================================
 
-if [ -f "${TOOLBOX_DIR}/common.sh" ]; then
-    source "${TOOLBOX_DIR}/common.sh"
-fi
-
+# 📊 系统监控功能 - 终极质感增强版
 function system_monitor() {
     show_header
     echo -e "${GOLD}📊 ====== 系统信息监控 ======${NC}"
@@ -88,6 +89,3 @@ function system_monitor() {
     read -p "⏎ " dummy
     main_menu
 }
-
-
-system_monitor

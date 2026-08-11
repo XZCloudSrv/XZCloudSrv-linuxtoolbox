@@ -1,9 +1,10 @@
 #!/bin/bash
+# ============================================================
+# 模块: network_tools.sh —— 网络测试工具(ping/路由/测速/端口/HTTP/网络信息)
+# 小战云Linux超级工具箱
+# ============================================================
 
-if [ -f "${TOOLBOX_DIR}/common.sh" ]; then
-    source "${TOOLBOX_DIR}/common.sh"
-fi
-
+# 🌐 网络工具菜单 - 终极质感增强版
 function network_tools() {
     show_header
     echo -e "${GOLD}🌐 ====== 网络测试工具 ======${NC}"
@@ -196,5 +197,67 @@ function network_info() {
     network_tools
 }
 
+# 🔌 端口测试 - 新增实现
+function port_test() {
+    show_header
+    echo -e "${GOLD}🔌 ====== 端口测试 ======${NC}"
+    gradient_border
+    read -p "🎯 请输入目标地址(默认: 127.0.0.1): " address
+    address=${address:-"127.0.0.1"}
+    read -p "🎯 请输入要测试的端口(如: 80 443 22 或范围如 1-1000): " port
 
-network_tools
+    echo -e "${CYAN}🔄 正在测试 ${address} 的端口 ${port} ...${NC}"
+    separator "─" "$BLUE"
+
+    if [[ "$port" == *-* ]]; then
+        local start_p=${port%-*}
+        local end_p=${port#*-}
+        for ((p=start_p; p<=end_p; p++)); do
+            (timeout 1 bash -c "echo > /dev/tcp/$address/$p") 2>/dev/null && \
+                echo -e "  ${GREEN}✅ 端口 $p 开放${NC}"
+        done
+    else
+        for p in $port; do
+            if (timeout 2 bash -c "echo > /dev/tcp/$address/$p") 2>/dev/null; then
+                echo -e "  ${GREEN}✅ 端口 $p 开放${NC}"
+            else
+                echo -e "  ${RED}❌ 端口 $p 关闭或不可达${NC}"
+            fi
+        done
+    fi
+
+    gradient_border
+    read -p "⏎ 按回车键返回..." dummy
+    network_tools
+}
+
+# 🌍 HTTP状态测试 - 新增实现
+function http_test() {
+    show_header
+    echo -e "${GOLD}🌍 ====== HTTP状态测试 ======${NC}"
+    gradient_border
+    read -p "🎯 请输入要检测的网址(如: https://www.xzyun.sbs): " url
+
+    echo -e "${CYAN}🔄 正在检测 ${url} ...${NC}"
+    separator "─" "$BLUE"
+
+    local start_ts=$(date +%s%N)
+    local http_code=$(curl -o /dev/null -s -m 10 -w "%{http_code}" "$url")
+    local end_ts=$(date +%s%N)
+    local elapsed_ms=$(( (end_ts - start_ts) / 1000000 ))
+
+    if [ -z "$http_code" ] || [ "$http_code" = "000" ]; then
+        echo -e "  ${RED}❌ 无法连接到目标地址${NC}"
+    elif [[ "$http_code" =~ ^2 ]]; then
+        echo -e "  ${GREEN}✅ HTTP状态码: $http_code (正常)${NC}"
+    elif [[ "$http_code" =~ ^3 ]]; then
+        echo -e "  ${YELLOW}↪️  HTTP状态码: $http_code (重定向)${NC}"
+    else
+        echo -e "  ${RED}⚠️  HTTP状态码: $http_code (异常)${NC}"
+    fi
+    echo -e "  ${CYAN}⏱️  响应耗时: ${elapsed_ms} ms${NC}"
+
+    gradient_border
+    read -p "⏎ 按回车键返回..." dummy
+    network_tools
+}

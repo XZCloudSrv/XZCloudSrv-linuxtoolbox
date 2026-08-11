@@ -1,9 +1,10 @@
 #!/bin/bash
+# ============================================================
+# 模块: panel.sh —— 面板/环境安装(宝塔/LNMP/LAMP/Cockpit/Webmin/1Panel)
+# 小战云Linux超级工具箱
+# ============================================================
 
-if [ -f "${TOOLBOX_DIR}/common.sh" ]; then
-    source "${TOOLBOX_DIR}/common.sh"
-fi
-
+# 🎛️ 面板安装功能 - 终极质感增强版
 panel_installation() {
     show_header
     echo -e "${GOLD}🎛️ ====== 面板安装 ======${NC}"
@@ -205,5 +206,86 @@ install_1panel() {
     panel_installation
 }
 
+# 🔴 安装LAMP环境 - 新增实现
+function install_lamp() {
+    show_header
+    echo -e "${GOLD}🔴 ====== 安装LAMP环境 ======${NC}"
+    gradient_border
 
-panel_installation
+    echo -e "${YELLOW}⚠️  注意: LAMP将安装Apache+MySQL/MariaDB+PHP${NC}"
+    separator "─" "$YELLOW"
+
+    read -p "🎯 是否继续安装? [Y/n]: " confirm
+    if [[ "$confirm" =~ ^[Nn] ]]; then
+        echo -e "${YELLOW}⏸️ 已取消安装${NC}"
+        sleep 1
+        panel_installation
+        return
+    fi
+
+    echo -e "${BLUE}📦 检测系统类型...${NC}"
+    if [ -f /usr/bin/apt ]; then
+        echo -e "${GREEN}✅ 检测到 Debian/Ubuntu${NC}"
+        sudo apt update
+        sudo apt install -y apache2 mariadb-server php libapache2-mod-php php-mysql
+        sudo systemctl enable --now apache2 mariadb
+    elif [ -f /usr/bin/yum ]; then
+        echo -e "${GREEN}✅ 检测到 CentOS/RHEL${NC}"
+        sudo yum install -y httpd mariadb-server php php-mysqlnd
+        sudo systemctl enable --now httpd mariadb
+    else
+        echo -e "${RED}❌ 无法确定系统类型${NC}"
+        read -p "⏎ 按回车键返回..." dummy
+        panel_installation
+        return
+    fi
+
+    separator "━" "$GREEN"
+    echo -e "${GREEN}🎉 LAMP环境安装完成！${NC}"
+    echo -e "  🌐 Apache端口: 80"
+    echo -e "  🗄️  MySQL/MariaDB端口: 3306"
+    echo -e "  📁 默认网站目录: /var/www/html"
+    echo -e "${YELLOW}💡 建议运行 mysql_secure_installation 加固数据库${NC}"
+
+    gradient_border
+    read -p "⏎ 按回车键返回..." dummy
+    panel_installation
+}
+
+# 🌐 安装Webmin - 新增实现
+function install_webmin() {
+    show_header
+    echo -e "${GOLD}🌐 ====== 安装Webmin ======${NC}"
+    gradient_border
+
+    echo -e "${YELLOW}💡 Webmin: 经典的Web系统管理界面${NC}"
+    separator "─" "$YELLOW"
+
+    read -p "🎯 是否继续安装? [Y/n]: " confirm
+    if [[ "$confirm" =~ ^[Nn] ]]; then
+        echo -e "${YELLOW}⏸️ 已取消安装${NC}"
+        sleep 1
+        panel_installation
+        return
+    fi
+
+    echo -e "${BLUE}📦 正在安装Webmin (官方脚本)...${NC}"
+    progress_bar 2
+    curl -o webmin-setup-repos.sh https://raw.githubusercontent.com/webmin/webmin/master/webmin-setup-repos.sh
+    sudo sh webmin-setup-repos.sh -f
+
+    if [ -f /usr/bin/apt ]; then
+        sudo apt-get install -y webmin --install-recommends
+    elif [ -f /usr/bin/yum ]; then
+        sudo yum install -y webmin
+    fi
+
+    separator "━" "$GREEN"
+    echo -e "${GREEN}🎉 Webmin安装完成！${NC}"
+    echo -e "  🌐 访问地址: https://服务器IP:10000"
+    echo -e "  🔐 使用系统账号密码登录"
+
+    gradient_border
+    read -p "⏎ 按回车键返回..." dummy
+    panel_installation
+}

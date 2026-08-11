@@ -1,9 +1,10 @@
 #!/bin/bash
+# ============================================================
+# 模块: security.sh —— 安全加固(SSH/防火墙/密码策略/root登录/审计/检查)
+# 小战云Linux超级工具箱
+# ============================================================
 
-if [ -f "${TOOLBOX_DIR}/common.sh" ]; then
-    source "${TOOLBOX_DIR}/common.sh"
-fi
-
+# 🛡️ 安全加固菜单 - 终极质感增强版
 function security_harden() {
     show_header
     echo -e "${GOLD}🛡️ ====== 安全加固设置 ======${NC}"
@@ -166,5 +167,142 @@ function security_check() {
     security_harden
 }
 
+# 🔥 防火墙配置 - 新增实现
+function firewall_config() {
+    show_header
+    echo -e "${GOLD}🔥 ====== 防火墙配置 ======${NC}"
+    gradient_border
+    echo -e "${GREEN}1. 查看防火墙状态${NC}"
+    echo -e "${BLUE}2. 启用防火墙${NC}"
+    echo -e "${RED}3. 关闭防火墙${NC}"
+    echo -e "${CYAN}4. 放行端口${NC}"
+    echo -e "${YELLOW}5. 关闭端口${NC}"
+    echo -e "${ORANGE}6. 返回上级菜单${NC}"
+    gradient_border
 
-security_harden
+    read -p "🎯 请输入选项 [1-6]: " choice
+
+    local fw=""
+    command -v ufw &>/dev/null && fw="ufw"
+    command -v firewall-cmd &>/dev/null && fw="firewalld"
+
+    case $choice in
+        1)
+            if [ "$fw" = "ufw" ]; then sudo ufw status verbose
+            elif [ "$fw" = "firewalld" ]; then sudo firewall-cmd --state; sudo firewall-cmd --list-all
+            else echo -e "${RED}❌ 未检测到 ufw / firewalld${NC}"; fi
+            ;;
+        2)
+            if [ "$fw" = "ufw" ]; then sudo ufw --force enable; echo -e "${GREEN}✅ UFW已启用${NC}"
+            elif [ "$fw" = "firewalld" ]; then sudo systemctl enable --now firewalld; echo -e "${GREEN}✅ Firewalld已启用${NC}"
+            else echo -e "${RED}❌ 未检测到防火墙组件${NC}"; fi
+            ;;
+        3)
+            read -p "🎯 确认关闭防火墙? [y/N]: " confirm
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                if [ "$fw" = "ufw" ]; then sudo ufw disable
+                elif [ "$fw" = "firewalld" ]; then sudo systemctl stop firewalld
+                fi
+                echo -e "${YELLOW}⏸️ 防火墙已关闭${NC}"
+            fi
+            ;;
+        4)
+            read -p "🎯 请输入要放行的端口: " port
+            if [ "$fw" = "ufw" ]; then sudo ufw allow "$port"
+            elif [ "$fw" = "firewalld" ]; then sudo firewall-cmd --permanent --add-port="${port}/tcp"; sudo firewall-cmd --reload
+            fi
+            echo -e "${GREEN}✅ 端口 $port 已放行${NC}"
+            ;;
+        5)
+            read -p "🎯 请输入要关闭的端口: " port
+            if [ "$fw" = "ufw" ]; then sudo ufw deny "$port"
+            elif [ "$fw" = "firewalld" ]; then sudo firewall-cmd --permanent --remove-port="${port}/tcp"; sudo firewall-cmd --reload
+            fi
+            echo -e "${GREEN}✅ 端口 $port 已关闭${NC}"
+            ;;
+        6)
+            security_harden
+            return
+            ;;
+        *)
+            echo -e "${RED}❌ 无效选项${NC}"
+            sleep 1
+            firewall_config
+            return
+            ;;
+    esac
+
+    separator "━" "$GREEN"
+    read -p "⏎ 按回车键继续..." dummy
+    firewall_config
+}
+
+# 🔑 密码策略设置 - 新增实现
+function password_policy() {
+    show_header
+    echo -e "${GOLD}🔑 ====== 密码策略设置 ======${NC}"
+    gradient_border
+
+    if [ ! -f /etc/login.defs ]; then
+        echo -e "${RED}❌ 未找到 /etc/login.defs，无法设置密码策略${NC}"
+        read -p "⏎ 按回车键返回..." dummy
+        security_harden
+        return
+    fi
+
+    echo -e "${YELLOW}⚠️  注意: 将修改 /etc/login.defs 中的密码有效期策略${NC}"
+    sudo cp /etc/login.defs /etc/login.defs.bak.$(date +%Y%m%d)
+    echo -e "${GREEN}✅ 已备份原文件${NC}"
+
+    read -p "🎯 密码最长有效天数(默认90): " max_days
+    max_days=${max_days:-90}
+    read -p "🎯 密码最短使用天数(默认0): " min_days
+    min_days=${min_days:-0}
+    read -p "🎯 密码过期前提醒天数(默认7): " warn_days
+    warn_days=${warn_days:-7}
+
+    sudo sed -i "s/^PASS_MAX_DAYS.*/PASS_MAX_DAYS   $max_days/" /etc/login.defs
+    sudo sed -i "s/^PASS_MIN_DAYS.*/PASS_MIN_DAYS   $min_days/" /etc/login.defs
+    sudo sed -i "s/^PASS_WARN_AGE.*/PASS_WARN_AGE   $warn_days/" /etc/login.defs
+
+    echo -e "${GREEN}🎉 密码策略已更新 (仅对之后新建的用户生效)${NC}"
+    echo -e "${GRAY}💡 对现有用户生效需执行: chage -M $max_days -m $min_days -W $warn_days 用户名${NC}"
+
+    gradient_border
+    read -p "⏎ 按回车键返回..." dummy
+    security_harden
+}
+
+# 🚫 禁用root登录 - 新增实现
+function disable_root_login() {
+    show_header
+    echo -e "${GOLD}🚫 ====== 禁用root登录 ======${NC}"
+    gradient_border
+
+    echo -e "${YELLOW}⚠️  注意: 禁用前请确保已创建具有sudo权限的普通用户${NC}"
+    echo -e "${GRAY}💡 否则可能导致无法远程管理服务器${NC}"
+    separator "─" "$YELLOW"
+
+    read -p "🎯 确认已具备普通sudo用户，继续禁用root登录? [y/N]: " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}⏸️ 已取消${NC}"
+        sleep 1
+        security_harden
+        return
+    fi
+
+    sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.$(date +%Y%m%d)
+    sudo sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+
+    if command -v systemctl &>/dev/null; then
+        sudo systemctl restart sshd
+    else
+        sudo service ssh restart
+    fi
+
+    echo -e "${GREEN}🎉 已禁用root登录，SSH服务已重启${NC}"
+
+    gradient_border
+    read -p "⏎ 按回车键返回..." dummy
+    security_harden
+}
